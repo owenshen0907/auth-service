@@ -7,7 +7,6 @@ import (
 
 	"auth-service/models"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -21,10 +20,8 @@ type ProfileResponse struct {
 // Profile 处理获取当前用户信息
 func Profile(database *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		session := sessions.Default(c)
-		userID := session.Get("user")
-
-		if userID == nil {
+		userID, exists := c.Get("userID")
+		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}

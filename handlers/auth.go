@@ -1,15 +1,17 @@
-// handlers/auth.go
 package handlers
 
 import (
 	"auth-service/db"
 	"database/sql"
 	"net/http"
+	"os"
+	"time"
 
 	"auth-service/models"
-
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	// 添加以下导入
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -36,16 +38,22 @@ func Register(database *db.Database) gin.HandlerFunc {
 			return
 		}
 
+		logrus.Infof("Registering user: %s", req.Username)
+
 		// 检查用户名是否已存在
 		var existingUserID int
 		err := database.DB.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&existingUserID)
-		if err != sql.ErrNoRows {
-			if err == nil {
-				c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
-				return
-			}
-			logrus.Errorf("Database error: %v", err)
+		if err == sql.ErrNoRows {
+			// 用户名不存在，继续注册流程
+		} else if err != nil {
+			// 数据库查询出错
+			logrus.Errorf("Database error while checking username: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		} else {
+			// 用户名已存在
+			logrus.Warnf("Username already exists: %s", req.Username)
+			c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
 			return
 		}
 
@@ -58,13 +66,14 @@ func Register(database *db.Database) gin.HandlerFunc {
 		}
 
 		// 创建用户
-		_, err = database.DB.Exec("INSERT INTO users (username, password) VALUES (?, ?)", req.Username, string(hashedPassword))
+		_, err = database.DB.Exec("INSERT INTO users (username, password, created_at, updated_at) VALUES (?, ?, ?, ?)", req.Username, string(hashedPassword), time.Now(), time.Now())
 		if err != nil {
 			logrus.Errorf("User creation failed: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
 		}
 
+		logrus.Infof("User registered successfully: %s", req.Username)
 		c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
 	}
 }
@@ -79,11 +88,14 @@ func Login(database *db.Database) gin.HandlerFunc {
 			return
 		}
 
+		logrus.Infof("User attempting to login: %s", req.Username)
+
 		// 查找用户
 		var user models.User
 		err := database.DB.QueryRow("SELECT id, password FROM users WHERE username = ?", req.Username).Scan(&user.ID, &user.Password)
 		if err != nil {
 			if err == sql.ErrNoRows {
+				logrus.Warnf("Invalid credentials for user: %s", req.Username)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 				return
 			}
@@ -94,19 +106,27 @@ func Login(database *db.Database) gin.HandlerFunc {
 
 		// 比较密码
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+			logrus.Warnf("Invalid credentials for user: %s", req.Username)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 			return
 		}
 
-		// 设置会话
-		session := sessions.Default(c)
-		session.Set("user", user.ID) // 存储用户ID
-		if err := session.Save(); err != nil {
-			logrus.Errorf("Failed to save session: %v", err)
+		// 生成 JWT
+		claims := jwt.MapClaims{
+			"userID": user.ID,
+			"exp":    jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+		tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+		if err != nil {
+			logrus.Errorf("Failed to sign token: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+		logrus.Infof("User logged in successfully: %s", req.Username)
+		c.JSON(http.StatusOK, gin.H{"message": "Login successful", "token": tokenString})
 	}
 }

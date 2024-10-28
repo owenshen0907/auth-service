@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	"net/http"
+	// "net/http"
 	"os"
 
 	"auth-service/db"
@@ -10,8 +10,6 @@ import (
 	"auth-service/middleware"
 
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
@@ -38,23 +36,12 @@ func main() {
 
 	// 配置 CORS 中间件
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://yourdomain.com"}, // 修改为实际允许的域
+		AllowOrigins:     []string{"http://localhost:3030"}, // 修改为实际允许的域
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-
-	// 配置会话中间件
-	store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
-	store.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7, // 7天
-		HttpOnly: true,
-		Secure:   false, // 在开发环境中可以设置为false，生产环境中应设置为true
-		SameSite: http.SameSiteLaxMode,
-	})
-	router.Use(sessions.Sessions("auth-session", store))
 
 	// 定义公开路由，并传递数据库实例
 	public := router.Group("/api")
@@ -65,7 +52,7 @@ func main() {
 
 	// 定义受保护路由
 	protected := router.Group("/api")
-	protected.Use(middleware.AuthMiddleware())
+	protected.Use(middleware.JWTMiddleware())
 	{
 		protected.GET("/profile", handlers.Profile(database))
 	}
