@@ -7,38 +7,32 @@ import (
 
 	"net/http"
 	"os"
-	"strings"
+	// "strings"
 )
 
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		tokenString, err := c.Cookie("auth-session")
+		if err != nil {
+			c.Redirect(http.StatusFound, "http://B-website.com/login")
 			c.Abort()
 			return
 		}
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
-			c.Abort()
-			return
-		}
-
+		// 解析和验证 JWT 令牌
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		if err != nil || !token.Valid {
+			c.Redirect(http.StatusFound, "http://B-website.com/login")
 			c.Abort()
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		if !ok {
+			c.Redirect(http.StatusFound, "http://B-website.com/login")
 			c.Abort()
 			return
 		}

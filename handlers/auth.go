@@ -9,9 +9,7 @@ import (
 
 	"auth-service/models"
 	"github.com/gin-gonic/gin"
-	// 添加以下导入
-	"github.com/golang-jwt/jwt/v5"
-
+	"github.com/golang-jwt/jwt/v5" // 导入 JWT 包
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -121,12 +119,24 @@ func Login(database *db.Database) gin.HandlerFunc {
 
 		tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 		if err != nil {
-			logrus.Errorf("Failed to sign token: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 			return
 		}
 
-		logrus.Infof("User logged in successfully: %s", req.Username)
-		c.JSON(http.StatusOK, gin.H{"message": "Login successful", "token": tokenString})
+		// 设置 Cookie
+		c.SetCookie(
+			"jwtToken",
+			tokenString,
+			3600,  // 过期时间，单位：秒
+			"/",   // Cookie 有效路径
+			"",    // 不设置 Domain，默认为当前域
+			false, // Secure，开发环境下为 false
+			true,  // HttpOnly
+		)
+
+		// 设置 SameSite 属性
+		c.SetSameSite(http.SameSiteLaxMode) // 或者使用 http.SameSiteNoneMode
+
+		c.JSON(http.StatusOK, gin.H{"message": "登录成功"})
 	}
 }
