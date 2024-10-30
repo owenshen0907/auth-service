@@ -7,9 +7,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"auth-service/models"
+
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5" // 导入 JWT 包
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -90,7 +92,7 @@ func Login(database *db.Database) gin.HandlerFunc {
 
 		// 查找用户
 		var user models.User
-		err := database.DB.QueryRow("SELECT id, password FROM users WHERE username = ?", req.Username).Scan(&user.ID, &user.Password)
+		err := database.DB.QueryRow("SELECT password FROM users WHERE username = ?", req.Username).Scan(&user.Password)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				logrus.Warnf("Invalid credentials for user: %s", req.Username)
@@ -111,8 +113,8 @@ func Login(database *db.Database) gin.HandlerFunc {
 
 		// 生成 JWT
 		claims := jwt.MapClaims{
-			"userID": user.ID,
-			"exp":    jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
+			"userName": req.Username,
+			"exp":      jwt.NewNumericDate(time.Now().Add(720 * time.Hour)),
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -127,11 +129,11 @@ func Login(database *db.Database) gin.HandlerFunc {
 		c.SetCookie(
 			"jwtToken",
 			tokenString,
-			3600,  // 过期时间，单位：秒
-			"/",   // Cookie 有效路径
-			"",    // 不设置 Domain，默认为当前域
-			false, // Secure，开发环境下为 false
-			true,  // HttpOnly
+			720*60*60, // 30 天，单位：秒
+			"/",       // Cookie 有效路径
+			"",        // 不设置 Domain，默认为当前域
+			false,     // Secure，开发环境下为 false
+			true,      // HttpOnly
 		)
 
 		// 设置 SameSite 属性
