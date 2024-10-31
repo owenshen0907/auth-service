@@ -29,9 +29,6 @@ WORKDIR /root/
 # 从构建阶段复制可执行文件
 COPY --from=builder /app/auth-service .
 
-# 复制 .env 文件
-COPY --from=builder /app/.env .
-
 # 暴露端口
 EXPOSE 5000
 
