@@ -8,6 +8,7 @@ WORKDIR /app
 
 # 复制 go.mod 和 go.sum 并下载依赖
 COPY go.mod go.sum ./
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 复制所有源代码
