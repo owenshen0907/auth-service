@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"strings"
+
 	// "net/http"
 	"os"
 
@@ -16,11 +18,16 @@ import (
 )
 
 func main() {
-	// 加载环境变量
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// 检查是否是生产环境，如果不是则加载 .env 文件
+	if os.Getenv("ENV") != "production" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
 	}
+	// 从环境变量中获取允许的来源
+	allowOrigins := os.Getenv("ALLOW_ORIGINS")
+	origins := strings.Split(allowOrigins, ",")
 
 	// 初始化日志
 	configureLogger()
@@ -36,7 +43,7 @@ func main() {
 
 	// 配置 CORS 中间件
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3030"}, // 修改为实际允许的域
+		AllowOrigins:     origins, // 使用配置文件中的 CORS 来源
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
