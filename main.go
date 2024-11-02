@@ -67,7 +67,7 @@ func main() {
 	// 监听端口
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000"
+		port = "5050"
 	}
 	if err := router.Run(":" + port); err != nil {
 		logrus.Fatalf("Failed to run server: %v", err)

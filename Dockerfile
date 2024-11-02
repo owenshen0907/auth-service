@@ -30,7 +30,7 @@ WORKDIR /root/
 COPY --from=builder /app/auth-service .
 
 # 暴露端口
-EXPOSE 5000
+EXPOSE 5050
 
 # 启动应用
 CMD ["./auth-service"]
